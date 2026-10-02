@@ -1,0 +1,33 @@
+{
+  "name": "Habit Tracker — Daily Goals & Progress",
+  "short_name": "Habit Tracker",
+  "description": "Track your daily habits, build consistency, and achieve your goals with a beautiful tracker.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDFAF7",
+  "theme_color": "#C4704B",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["productivity", "lifestyle"],
+  "lang": "en",
+  "dir": "ltr"
+}
