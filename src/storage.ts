@@ -1,4 +1,6 @@
-import type { TrackerData, Habit, DayEntry, Theme, QuickNote, RoutineItem } from './types';
+import type { TrackerData, Habit, DayEntry, Theme, QuickNote } from './types';
+import { type RoutineItem, normalizeTimeString, normalizeRoutineItem } from './types';
+export { normalizeTimeString, normalizeRoutineItem };
 import {
   fetchAllData,
   syncFullData,
@@ -214,8 +216,11 @@ export async function saveNotesAsync(notes: QuickNote[]): Promise<void> {
 
 // ─── Daily Routine ─────────────────────────────────────────────
 
+
+
 export function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
+  const normalized = normalizeTimeString(time, '08:00');
+  const [h, m] = normalized.split(':').map(Number);
   const total = h * 60 + m + minutes;
   const newH = Math.floor(total / 60) % 24;
   const newM = total % 60;
@@ -237,16 +242,47 @@ const DEFAULT_ROUTINE: RoutineItem[] = [
   { id: crypto.randomUUID(), time: '22:00', endTime: '22:30', activity: 'Wind Down & Sleep', emoji: '😴', days: ALL_DAYS },
 ];
 
+const ROUTINE_STORAGE_KEY = 'habit_tracker_routine_data';
+
 export async function loadRoutineAsync(): Promise<RoutineItem[]> {
   try {
     const { routine } = await fetchAllData(false);
-    if (routine && routine.length > 0) return routine;
+    if (routine && routine.length > 0) {
+      const normalized = routine.map(normalizeRoutineItem);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(ROUTINE_STORAGE_KEY, JSON.stringify(normalized));
+        } catch {}
+      }
+      return normalized;
+    }
   } catch (e) {
     console.error('Failed to load routine from backend:', e);
   }
+
+  // Fallback to localStorage cache
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(ROUTINE_STORAGE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(normalizeRoutineItem);
+        }
+      }
+    } catch {}
+  }
+
   return DEFAULT_ROUTINE;
 }
 
 export async function saveRoutineAsync(routine: RoutineItem[]): Promise<void> {
-  await syncRoutine(routine);
+  const normalized = routine.map(normalizeRoutineItem);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(ROUTINE_STORAGE_KEY, JSON.stringify(normalized));
+    } catch {}
+  }
+  await syncRoutine(normalized);
 }
+

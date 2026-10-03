@@ -59,6 +59,25 @@ let state = {
   version: 1
 };
 
+const STATE_CACHE_FILE = path.join(__dirname, '.tracker-state.json');
+try {
+  if (fs.existsSync(STATE_CACHE_FILE)) {
+    const cached = JSON.parse(fs.readFileSync(STATE_CACHE_FILE, 'utf8'));
+    if (cached && typeof cached === 'object') {
+      if (Array.isArray(cached.habits) && cached.habits.length > 0) state.habits = cached.habits;
+      if (Array.isArray(cached.entries)) state.entries = cached.entries;
+      if (Array.isArray(cached.notes)) state.notes = cached.notes;
+      if (Array.isArray(cached.routine) && cached.routine.length > 0) state.routine = normalizeRoutineItems(cached.routine);
+    }
+  }
+} catch (e) {}
+
+function persistLocalState() {
+  try {
+    fs.writeFileSync(STATE_CACHE_FILE, JSON.stringify(state, null, 2), 'utf8');
+  } catch (e) {}
+}
+
 let googleScriptUrl = process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL || '';
 let isSyncing = false;
 let syncTimeout = null;
@@ -96,6 +115,37 @@ function httpsFetch(url, options = {}) {
       reject(e);
     }
   });
+}
+
+// Helper to normalize routine time strings to HH:MM format
+function normalizeTime(val, fallback = '08:00') {
+  if (!val) return fallback;
+  const str = String(val).trim();
+  if (str.includes('T')) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+  }
+  const match = str.match(/(?:^|\s|T)?(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (match) {
+    const h = String(parseInt(match[1], 10)).padStart(2, '0');
+    const m = match[2];
+    return `${h}:${m}`;
+  }
+  return fallback;
+}
+
+function normalizeRoutineItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map(r => ({
+    ...r,
+    time: normalizeTime(r.time, '08:00'),
+    endTime: normalizeTime(r.endTime, '09:00'),
+    days: Array.isArray(r.days) && r.days.length > 0 ? r.days : [0, 1, 2, 3, 4, 5, 6]
+  }));
 }
 
 // Helper to push queued state to Google Apps Script
@@ -140,6 +190,7 @@ let lastClientUpdateAt = 0;
 
 // Debounce helper to prevent spamming Google Sheets on rapid interactions
 function scheduleSync() {
+  persistLocalState();
   if (syncTimeout) clearTimeout(syncTimeout);
   syncTimeout = setTimeout(() => {
     pushToGoogleSheet();
@@ -179,7 +230,7 @@ async function fetchFromGoogleSheet(force = false) {
         }
         if (data.entries) state.entries = data.entries;
         if (data.notes) state.notes = data.notes;
-        if (data.routine && data.routine.length > 0) state.routine = data.routine;
+        if (data.routine && data.routine.length > 0) state.routine = normalizeRoutineItems(data.routine);
         lastFetchedAt = Date.now();
         lastSyncedAt = new Date().toISOString();
         lastSyncError = null;
@@ -305,7 +356,7 @@ app.post(['/api/sync', '/sync'], async (req, res) => {
   if (habits && Array.isArray(habits)) state.habits = habits;
   if (entries && Array.isArray(entries)) state.entries = entries;
   if (notes && Array.isArray(notes)) state.notes = notes;
-  if (routine && Array.isArray(routine)) state.routine = routine;
+  if (routine && Array.isArray(routine)) state.routine = normalizeRoutineItems(routine);
 
   if (process.env.VERCEL) {
     await pushToGoogleSheet();
@@ -393,7 +444,7 @@ app.post(['/api/routine', '/routine'], async (req, res) => {
   lastClientUpdateAt = Date.now();
   const { routine } = req.body;
   if (routine && Array.isArray(routine)) {
-    state.routine = routine;
+    state.routine = normalizeRoutineItems(routine);
     if (process.env.VERCEL) {
       await pushToGoogleSheet();
     } else {

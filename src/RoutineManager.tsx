@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { RoutineItem } from './types';
+import { normalizeTimeString, normalizeRoutineItem } from './types';
 import { loadRoutineAsync, saveRoutineAsync, addMinutesToTime } from './storage';
 import {
   ArrowLeft,
@@ -14,31 +15,43 @@ import {
 } from 'lucide-react';
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
-const MINUTES = ['00', '15', '30', '45'];
+const DEFAULT_MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
 
 function to24(h: number, m: string, ampm: 'AM' | 'PM'): string {
-  let hour = h % 12;
-  if (ampm === 'PM') hour += 12;
-  return `${String(hour).padStart(2, '0')}:${m}`;
+  let hour = h;
+  if (ampm === 'PM') {
+    hour = h === 12 ? 12 : h + 12;
+  } else {
+    hour = h === 12 ? 0 : h;
+  }
+  const cleanM = String(parseInt(m, 10) || 0).padStart(2, '0');
+  return `${String(hour).padStart(2, '0')}:${cleanM}`;
 }
 
 function from24(time24: string): { h: number; m: string; ampm: 'AM' | 'PM' } {
-  const [hStr, mStr] = time24.split(':');
-  const hour = parseInt(hStr);
+  const normalized = normalizeTimeString(time24, '08:00');
+  const [hStr, mStr] = normalized.split(':');
+  let hour = parseInt(hStr, 10);
+  if (isNaN(hour)) hour = 8;
   const ampm: 'AM' | 'PM' = hour >= 12 ? 'PM' : 'AM';
   const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-  const raw = parseInt(mStr);
-  const snapped = MINUTES.reduce((prev, cur) =>
-    Math.abs(parseInt(cur) - raw) < Math.abs(parseInt(prev) - raw) ? cur : prev
-  );
-  return { h, m: snapped, ampm };
+  const rawM = parseInt(mStr, 10);
+  const m = isNaN(rawM) ? '00' : String(rawM).padStart(2, '0');
+  return { h, m, ampm };
+}
+
+function formatTime(time: string) {
+  const { h, m, ampm } = from24(time);
+  return `${h}:${m} ${ampm}`;
 }
 
 function getDuration(start: string, end: string): string {
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
+  const sNorm = normalizeTimeString(start, '08:00');
+  const eNorm = normalizeTimeString(end, '09:00');
+  const [sh, sm] = sNorm.split(':').map(Number);
+  const [eh, em] = eNorm.split(':').map(Number);
   const diff = (eh * 60 + em) - (sh * 60 + sm);
-  if (diff <= 0) return '';
+  if (isNaN(diff) || diff <= 0) return '';
   const hrs = Math.floor(diff / 60);
   const mins = diff % 60;
   if (hrs === 0) return `${mins}m`;
@@ -56,6 +69,12 @@ function TimePicker({ label, value, onChange }: TimePickerProps) {
   const update = (newH: number, newM: string, newAmpm: 'AM' | 'PM') => {
     onChange(to24(newH, newM, newAmpm));
   };
+
+  const minuteOptions = useMemo(() => {
+    if (DEFAULT_MINUTES.includes(m)) return DEFAULT_MINUTES;
+    return [...DEFAULT_MINUTES, m].sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+  }, [m]);
+
   return (
     <div>
       <label className="block text-sm font-medium mb-1.5 text-surface-600">{label}</label>
@@ -63,7 +82,7 @@ function TimePicker({ label, value, onChange }: TimePickerProps) {
         <div className="relative flex-1">
           <select
             value={h}
-            onChange={e => update(parseInt(e.target.value), m, ampm)}
+            onChange={e => update(parseInt(e.target.value, 10), m, ampm)}
             className="w-full appearance-none bg-transparent text-sm font-semibold text-center text-surface-800 focus:outline-none cursor-pointer py-1 pr-4"
           >
             {HOURS.map(hr => (
@@ -79,7 +98,7 @@ function TimePicker({ label, value, onChange }: TimePickerProps) {
             onChange={e => update(h, e.target.value, ampm)}
             className="w-full appearance-none bg-transparent text-sm font-semibold text-center text-surface-800 focus:outline-none cursor-pointer py-1 pr-4"
           >
-            {MINUTES.map(mn => (
+            {minuteOptions.map(mn => (
               <option key={mn} value={mn}>{mn}</option>
             ))}
           </select>
@@ -149,7 +168,7 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
   // Load routine
   useEffect(() => {
     loadRoutineAsync().then(data => {
-      setRoutine(data);
+      setRoutine(data.map(normalizeRoutineItem));
       setLoaded(true);
       loadedRef.current = true;
     });
@@ -176,7 +195,11 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
   const dayItems = useMemo(() => {
     return routine
       .filter(item => item.days.includes(selectedDay))
-      .sort((a, b) => a.time.localeCompare(b.time));
+      .sort((a, b) => {
+        const tA = normalizeTimeString(a.time, '08:00');
+        const tB = normalizeTimeString(b.time, '08:00');
+        return tA.localeCompare(tB);
+      });
   }, [routine, selectedDay]);
 
   // Count items per day for the tabs
@@ -185,14 +208,6 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
       routine.filter(item => item.days.includes(day)).length
     );
   }, [routine]);
-
-  const formatTime = (time: string) => {
-    const [h, m] = time.split(':');
-    const hour = parseInt(h);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-    return `${displayHour}:${m} ${ampm}`;
-  };
 
   // ─── Form Handlers ──────────────────────────────────────────
   const resetForm = () => {
@@ -226,8 +241,8 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
   const openEditForm = (item: RoutineItem, days: number[]) => {
     setEditingId(item.id);
     setEditingItem(item);
-    setFormTime(item.time);
-    setFormEndTime(item.endTime);
+    setFormTime(normalizeTimeString(item.time, '08:00'));
+    setFormEndTime(normalizeTimeString(item.endTime, '09:00'));
     setFormActivity(item.activity);
     setFormEmoji(item.emoji);
     setFormDays([...days]);
@@ -241,7 +256,13 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
     if (!pendingEditItem) return;
     const updatedOriginal = { ...pendingEditItem, days: pendingEditItem.days.filter(d => d !== selectedDay) };
     const detachedId = crypto.randomUUID();
-    const detachedItem: RoutineItem = { ...pendingEditItem, id: detachedId, days: [selectedDay] };
+    const detachedItem: RoutineItem = {
+      ...pendingEditItem,
+      id: detachedId,
+      time: normalizeTimeString(pendingEditItem.time, '08:00'),
+      endTime: normalizeTimeString(pendingEditItem.endTime, '09:00'),
+      days: [selectedDay]
+    };
     setRoutine(prev => [
       ...prev.filter(r => r.id !== pendingEditItem.id),
       ...(updatedOriginal.days.length > 0 ? [updatedOriginal] : []),
@@ -258,17 +279,20 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
   const saveItem = useCallback(() => {
     if (!formActivity.trim()) return;
 
+    const cleanTime = normalizeTimeString(formTime, '08:00');
+    const cleanEndTime = normalizeTimeString(formEndTime, '09:00');
+
     if (editingId) {
       setRoutine(prev => prev.map(r =>
         r.id === editingId
-          ? { ...r, time: formTime, endTime: formEndTime, activity: formActivity.trim(), emoji: formEmoji, days: formDays }
+          ? { ...r, time: cleanTime, endTime: cleanEndTime, activity: formActivity.trim(), emoji: formEmoji, days: formDays }
           : r
       ));
     } else {
       const newItem: RoutineItem = {
         id: crypto.randomUUID(),
-        time: formTime,
-        endTime: formEndTime,
+        time: cleanTime,
+        endTime: cleanEndTime,
         activity: formActivity.trim(),
         emoji: formEmoji,
         days: formDays,
@@ -377,8 +401,10 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
   const isCurrentTimeSlot = (time: string, endTime: string) => {
     const now = new Date();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const [sh, sm] = time.split(':').map(Number);
-    const [eh, em] = endTime.split(':').map(Number);
+    const sNorm = normalizeTimeString(time, '08:00');
+    const eNorm = normalizeTimeString(endTime, '09:00');
+    const [sh, sm] = sNorm.split(':').map(Number);
+    const [eh, em] = eNorm.split(':').map(Number);
     const startMin = sh * 60 + sm;
     const endMin = eh * 60 + em;
     return now.getDay() === selectedDay && nowMinutes >= startMin && nowMinutes < endMin;

@@ -35,6 +35,23 @@ const HEADERS = {
   routine: ['id', 'time', 'endTime', 'activity', 'emoji', 'days']
 };
 
+function extractTime(val, fallback) {
+  if (!val) return fallback;
+  if (val instanceof Date) {
+    var hh = ('0' + val.getHours()).slice(-2);
+    var mm = ('0' + val.getMinutes()).slice(-2);
+    return hh + ':' + mm;
+  }
+  var str = String(val).trim();
+  var match = str.match(/(?:^|\s|T)?(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (match) {
+    var h = ('0' + parseInt(match[1], 10)).slice(-2);
+    var m = match[2];
+    return h + ':' + m;
+  }
+  return fallback;
+}
+
 function getOrCreateSheet(ss, name, headers) {
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
@@ -122,8 +139,8 @@ function doGet(e) {
       }
       routine.push({
         id: String(row[0]),
-        time: String(row[1] || '08:00'),
-        endTime: String(row[2] || '09:00'),
+        time: extractTime(row[1], '08:00'),
+        endTime: extractTime(row[2], '09:00'),
         activity: String(row[3] || ''),
         emoji: String(row[4] || '🎯'),
         days: days.length > 0 ? days : [0, 1, 2, 3, 4, 5, 6]
@@ -219,14 +236,17 @@ function doPost(e) {
         sheet.getRange(2, 1, lastRow - 1, HEADERS.routine.length).clearContent();
       }
       if (body.routine.length > 0) {
-        const rows = body.routine.map(r => [
-          r.id,
-          r.time || '08:00',
-          r.endTime || '09:00',
-          r.activity || '',
-          r.emoji || '🎯',
-          JSON.stringify(r.days || [0, 1, 2, 3, 4, 5, 6])
-        ]);
+        var rows = body.routine.map(function(r) {
+          return [
+            r.id,
+            extractTime(r.time, '08:00'),
+            extractTime(r.endTime, '09:00'),
+            r.activity || '',
+            r.emoji || '🎯',
+            JSON.stringify(r.days || [0, 1, 2, 3, 4, 5, 6])
+          ];
+        });
+        sheet.getRange(2, 2, rows.length, 2).setNumberFormat('@');
         sheet.getRange(2, 1, rows.length, HEADERS.routine.length).setValues(rows);
       }
     }

@@ -1,4 +1,5 @@
 import type { TrackerData, Habit, QuickNote, RoutineItem } from './types';
+import { normalizeRoutineItem } from './types';
 
 export interface BackendStatus {
   configured: boolean;
@@ -164,7 +165,7 @@ export async function fetchAllData(fresh: boolean = false): Promise<{
           version: json.version || 1
         },
         notes: json.notes || [],
-        routine: json.routine || []
+        routine: Array.isArray(json.routine) ? json.routine.map(normalizeRoutineItem) : []
       };
     }
   } catch (err) {
@@ -184,7 +185,7 @@ export async function fetchAllData(fresh: boolean = false): Promise<{
             version: json.version || 1
           },
           notes: json.notes || [],
-          routine: json.routine || []
+          routine: Array.isArray(json.routine) ? json.routine.map(normalizeRoutineItem) : []
         };
       }
     } catch (directErr) {
@@ -328,13 +329,29 @@ export async function syncNotes(notes: QuickNote[]): Promise<void> {
  * Real-time routine save
  */
 export async function syncRoutine(routine: RoutineItem[]): Promise<void> {
+  const activeUrl = getActiveScriptUrl();
+  const normalized = routine.map(normalizeRoutineItem);
   try {
-    await fetch(`${API_BASE}/routine`, {
+    const res = await fetch(`${API_BASE}/routine`, {
       method: 'POST',
       headers: getHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ routine })
+      body: JSON.stringify({ routine: normalized })
     });
+    if (res.ok) return;
   } catch {
     // Falls back seamlessly
+  }
+
+  if (activeUrl) {
+    try {
+      await fetch(activeUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ routine: normalized }),
+        mode: 'no-cors'
+      });
+    } catch (err) {
+      console.error('Direct Google Sheets routine sync error:', err);
+    }
   }
 }

@@ -1,0 +1,243 @@
+{
+  "habits": [
+    {
+      "id": "1",
+      "name": "Wake up at 06:00",
+      "emoji": "⏰",
+      "monthlyGoal": 25,
+      "createdAt": "2026-10-03T23:43:43.145Z",
+      "order": 0
+    },
+    {
+      "id": "2",
+      "name": "Workout",
+      "emoji": "🏋️",
+      "monthlyGoal": 26,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 1
+    },
+    {
+      "id": "3",
+      "name": "Read 20 Pages",
+      "emoji": "📖",
+      "monthlyGoal": 24,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 2
+    },
+    {
+      "id": "4",
+      "name": "Meditate",
+      "emoji": "🧘",
+      "monthlyGoal": 28,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 3
+    },
+    {
+      "id": "5",
+      "name": "No Junk Food",
+      "emoji": "🥗",
+      "monthlyGoal": 27,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 4
+    },
+    {
+      "id": "6",
+      "name": "Budget Tracking",
+      "emoji": "💰",
+      "monthlyGoal": 23,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 5
+    },
+    {
+      "id": "7",
+      "name": "Social Media Detox",
+      "emoji": "📵",
+      "monthlyGoal": 23,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 6
+    },
+    {
+      "id": "8",
+      "name": "Journal My Day",
+      "emoji": "📝",
+      "monthlyGoal": 28,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 7
+    },
+    {
+      "id": "9",
+      "name": "Cold Shower",
+      "emoji": "🚿",
+      "monthlyGoal": 24,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 8
+    },
+    {
+      "id": "10",
+      "name": "Eat Healthy",
+      "emoji": "🍎",
+      "monthlyGoal": 26,
+      "createdAt": "2026-10-03T23:43:43.146Z",
+      "order": 9
+    }
+  ],
+  "entries": [],
+  "notes": [],
+  "routine": [
+    {
+      "id": "r1",
+      "time": "06:00",
+      "endTime": "06:30",
+      "activity": "Wake Up & Stretch",
+      "emoji": "🌅",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "r2",
+      "time": "06:30",
+      "endTime": "07:30",
+      "activity": "Morning Workout",
+      "emoji": "🏋️",
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "r3",
+      "time": "07:30",
+      "endTime": "08:00",
+      "activity": "Breakfast",
+      "emoji": "🥗",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "r4",
+      "time": "08:00",
+      "endTime": "12:00",
+      "activity": "Deep Work Block",
+      "emoji": "💻",
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "r5",
+      "time": "12:00",
+      "endTime": "13:00",
+      "activity": "Lunch Break",
+      "emoji": "🍱",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "r6",
+      "time": "13:00",
+      "endTime": "17:00",
+      "activity": "Focused Study",
+      "emoji": "📖",
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "id": "r7",
+      "time": "17:00",
+      "endTime": "18:00",
+      "activity": "Exercise / Walk",
+      "emoji": "🚶",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "r8",
+      "time": "19:00",
+      "endTime": "19:45",
+      "activity": "Dinner",
+      "emoji": "🍽️",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "r9",
+      "time": "20:00",
+      "endTime": "21:30",
+      "activity": "Reading / Hobby",
+      "emoji": "📚",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "r10",
+      "time": "22:00",
+      "endTime": "22:30",
+      "activity": "Wind Down & Sleep",
+      "emoji": "😴",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    }
+  ],
+  "version": 1
+}
