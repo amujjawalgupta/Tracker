@@ -10,7 +10,101 @@ import {
   ClipboardPaste,
   Clock,
   MoreVertical,
+  ChevronDown,
 } from 'lucide-react';
+
+const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
+const MINUTES = ['00', '15', '30', '45'];
+
+function to24(h: number, m: string, ampm: 'AM' | 'PM'): string {
+  let hour = h % 12;
+  if (ampm === 'PM') hour += 12;
+  return `${String(hour).padStart(2, '0')}:${m}`;
+}
+
+function from24(time24: string): { h: number; m: string; ampm: 'AM' | 'PM' } {
+  const [hStr, mStr] = time24.split(':');
+  const hour = parseInt(hStr);
+  const ampm: 'AM' | 'PM' = hour >= 12 ? 'PM' : 'AM';
+  const h = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const raw = parseInt(mStr);
+  const snapped = MINUTES.reduce((prev, cur) =>
+    Math.abs(parseInt(cur) - raw) < Math.abs(parseInt(prev) - raw) ? cur : prev
+  );
+  return { h, m: snapped, ampm };
+}
+
+function getDuration(start: string, end: string): string {
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) return '';
+  const hrs = Math.floor(diff / 60);
+  const mins = diff % 60;
+  if (hrs === 0) return `${mins}m`;
+  if (mins === 0) return `${hrs}h`;
+  return `${hrs}h ${mins}m`;
+}
+
+interface TimePickerProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+}
+function TimePicker({ label, value, onChange }: TimePickerProps) {
+  const { h, m, ampm } = from24(value);
+  const update = (newH: number, newM: string, newAmpm: 'AM' | 'PM') => {
+    onChange(to24(newH, newM, newAmpm));
+  };
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1.5 text-surface-600">{label}</label>
+      <div className="flex items-center gap-1 p-2 rounded-xl border bg-surface-50 border-surface-200 focus-within:ring-2 focus-within:ring-primary-500/40">
+        <div className="relative flex-1">
+          <select
+            value={h}
+            onChange={e => update(parseInt(e.target.value), m, ampm)}
+            className="w-full appearance-none bg-transparent text-sm font-semibold text-center text-surface-800 focus:outline-none cursor-pointer py-1 pr-4"
+          >
+            {HOURS.map(hr => (
+              <option key={hr} value={hr}>{String(hr).padStart(2, '0')}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 text-surface-400 pointer-events-none" />
+        </div>
+        <span className="text-surface-400 font-bold text-sm">:</span>
+        <div className="relative flex-1">
+          <select
+            value={m}
+            onChange={e => update(h, e.target.value, ampm)}
+            className="w-full appearance-none bg-transparent text-sm font-semibold text-center text-surface-800 focus:outline-none cursor-pointer py-1 pr-4"
+          >
+            {MINUTES.map(mn => (
+              <option key={mn} value={mn}>{mn}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 text-surface-400 pointer-events-none" />
+        </div>
+        <div className="flex rounded-lg overflow-hidden border border-surface-200 shrink-0">
+          {(['AM', 'PM'] as const).map(period => (
+            <button
+              key={period}
+              type="button"
+              onClick={() => update(h, m, period)}
+              className={`px-2.5 py-1 text-xs font-bold transition-all ${
+                ampm === period
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white text-surface-500 hover:bg-surface-100'
+              }`}
+            >
+              {period}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface RoutineManagerProps {
   onBack: () => void;
@@ -28,11 +122,16 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
   // Add/Edit form
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<RoutineItem | null>(null);
   const [formTime, setFormTime] = useState('08:00');
   const [formEndTime, setFormEndTime] = useState('09:00');
   const [formActivity, setFormActivity] = useState('');
   const [formEmoji, setFormEmoji] = useState('🎯');
   const [formDays, setFormDays] = useState<number[]>([new Date().getDay()]);
+
+  // Edit scope dialog
+  const [showEditScope, setShowEditScope] = useState(false);
+  const [pendingEditItem, setPendingEditItem] = useState<RoutineItem | null>(null);
 
   // Copy day modal
   const [showCopyModal, setShowCopyModal] = useState(false);
@@ -104,6 +203,7 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
     setFormDays([selectedDay]);
     setShowAddForm(false);
     setEditingId(null);
+    setEditingItem(null);
   };
 
   const openAddForm = () => {
@@ -112,15 +212,47 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
     setShowAddForm(true);
   };
 
-  const startEdit = (item: RoutineItem) => {
+  // Called when user clicks Edit from the context menu
+  const handleEditClick = (item: RoutineItem) => {
+    setMenuItemId(null);
+    if (item.days.length > 1) {
+      setPendingEditItem(item);
+      setShowEditScope(true);
+    } else {
+      openEditForm(item, item.days);
+    }
+  };
+
+  const openEditForm = (item: RoutineItem, days: number[]) => {
     setEditingId(item.id);
+    setEditingItem(item);
     setFormTime(item.time);
     setFormEndTime(item.endTime);
     setFormActivity(item.activity);
     setFormEmoji(item.emoji);
-    setFormDays([...item.days]);
+    setFormDays([...days]);
     setShowAddForm(true);
-    setMenuItemId(null);
+    setShowEditScope(false);
+    setPendingEditItem(null);
+  };
+
+  // Detach selected day from multi-day item, then edit the detached copy
+  const editThisDayOnly = () => {
+    if (!pendingEditItem) return;
+    const updatedOriginal = { ...pendingEditItem, days: pendingEditItem.days.filter(d => d !== selectedDay) };
+    const detachedId = crypto.randomUUID();
+    const detachedItem: RoutineItem = { ...pendingEditItem, id: detachedId, days: [selectedDay] };
+    setRoutine(prev => [
+      ...prev.filter(r => r.id !== pendingEditItem.id),
+      ...(updatedOriginal.days.length > 0 ? [updatedOriginal] : []),
+      detachedItem,
+    ]);
+    setTimeout(() => openEditForm(detachedItem, [selectedDay]), 50);
+  };
+
+  const editAllDays = () => {
+    if (!pendingEditItem) return;
+    openEditForm(pendingEditItem, pendingEditItem.days);
   };
 
   const saveItem = useCallback(() => {
@@ -446,7 +578,7 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
                           }`}
                         >
                           <button
-                            onClick={() => startEdit(item)}
+                            onClick={() => handleEditClick(item)}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-surface-700 hover:bg-surface-50 transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" /> Edit
@@ -484,6 +616,48 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
       </div>
 
       {/* ═══════════════════════════════════════════════════════
+          EDIT SCOPE DIALOG
+          ═══════════════════════════════════════════════════════ */}
+      {showEditScope && pendingEditItem && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowEditScope(false); setPendingEditItem(null); }} />
+          <div className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl fade-in bg-white border border-surface-200">
+            <div className="text-center mb-5">
+              <div className="text-3xl mb-3">{pendingEditItem.emoji}</div>
+              <h2 className="text-lg font-bold text-surface-800 mb-1">Edit "{pendingEditItem.activity}"</h2>
+              <p className="text-sm text-surface-500">
+                This runs on{' '}
+                <strong>{pendingEditItem.days.sort().map(d => DAY_SHORT[d]).join(', ')}</strong>.
+                {' '}What would you like to edit?
+              </p>
+            </div>
+            <div className="space-y-2.5">
+              <button
+                onClick={editThisDayOnly}
+                className="w-full flex flex-col items-start gap-0.5 px-4 py-3.5 rounded-xl border-2 border-primary-500 bg-primary-50 text-left hover:bg-primary-100 transition-all"
+              >
+                <span className="text-sm font-bold text-primary-700">✏️ Edit for {DAY_NAMES[selectedDay]} only</span>
+                <span className="text-xs text-primary-600">Detaches this day so changes only apply to {DAY_SHORT[selectedDay]}</span>
+              </button>
+              <button
+                onClick={editAllDays}
+                className="w-full flex flex-col items-start gap-0.5 px-4 py-3.5 rounded-xl border-2 border-surface-200 bg-surface-50 text-left hover:bg-surface-100 transition-all"
+              >
+                <span className="text-sm font-bold text-surface-700">📅 Edit for all days</span>
+                <span className="text-xs text-surface-500">Changes apply to all {pendingEditItem.days.length} days</span>
+              </button>
+            </div>
+            <button
+              onClick={() => { setShowEditScope(false); setPendingEditItem(null); }}
+              className="w-full mt-3 py-2.5 rounded-xl text-sm font-medium bg-surface-100 hover:bg-surface-200 text-surface-600 transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
           ADD / EDIT MODAL
           ═══════════════════════════════════════════════════════ */}
       {showAddForm && (
@@ -498,6 +672,13 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
                 <><Plus className="w-5 h-5 text-primary-500" /> Add Activity</>
               )}
             </h2>
+
+            {/* Note when editing a single-day detached item */}
+            {editingId && editingItem && editingItem.days.length === 1 && (
+              <div className="mb-4 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-medium">
+                ✏️ Editing only for <strong>{DAY_NAMES[editingItem.days[0]]}</strong>
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* Activity Name */}
@@ -514,27 +695,23 @@ export function RoutineManager({ onBack }: RoutineManagerProps) {
                 />
               </div>
 
-              {/* Time Range */}
+              {/* Time Range — custom pickers */}
               <div className="flex gap-3">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1.5 text-surface-600">Start Time</label>
-                  <input
-                    type="time"
-                    value={formTime}
-                    onChange={e => setFormTime(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40 bg-surface-50 border-surface-200 text-surface-900"
-                  />
+                  <TimePicker label="Start Time" value={formTime} onChange={setFormTime} />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-sm font-medium mb-1.5 text-surface-600">End Time</label>
-                  <input
-                    type="time"
-                    value={formEndTime}
-                    onChange={e => setFormEndTime(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40 bg-surface-50 border-surface-200 text-surface-900"
-                  />
+                  <TimePicker label="End Time" value={formEndTime} onChange={setFormEndTime} />
                 </div>
               </div>
+
+              {/* Duration badge */}
+              {getDuration(formTime, formEndTime) && (
+                <div className="flex items-center gap-1.5 -mt-2">
+                  <Clock className="w-3.5 h-3.5 text-primary-500" />
+                  <span className="text-xs font-medium text-primary-600">{getDuration(formTime, formEndTime)} duration</span>
+                </div>
+              )}
 
               {/* Emoji Picker */}
               <div>
