@@ -119,9 +119,26 @@ function httpsFetch(url, options = {}) {
 
 // Helper to normalize routine time strings to HH:MM format
 function normalizeTime(val, fallback = '08:00') {
-  if (!val) return fallback;
-  const str = String(val).trim();
-  if (str.includes('T')) {
+  if (val === undefined || val === null || val === '') return fallback;
+  if (val instanceof Date) {
+    const hh = String(val.getHours()).padStart(2, '0');
+    const mm = String(val.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+  let str = String(val).trim();
+  
+  const num = Number(str);
+  if (!isNaN(num) && num >= 0 && num < 1 && str.includes('.')) {
+    const totalMins = Math.round(num * 24 * 60);
+    const h = String(Math.floor(totalMins / 60)).padStart(2, '0');
+    const m = String(totalMins % 60).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  
+  if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+    if (str.includes('1899')) {
+      str = str.replace('1899-12-30', '2000-01-01');
+    }
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
       const h = String(d.getHours()).padStart(2, '0');
@@ -129,6 +146,7 @@ function normalizeTime(val, fallback = '08:00') {
       return `${h}:${m}`;
     }
   }
+
   const match = str.match(/(?:^|\s|T)?(\d{1,2}):(\d{2})(?::\d{2})?/);
   if (match) {
     const h = String(parseInt(match[1], 10)).padStart(2, '0');

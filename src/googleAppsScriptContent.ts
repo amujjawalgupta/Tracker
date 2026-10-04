@@ -1,34 +1,4 @@
-/**
- * Complete Google Apps Script content embedded for in-browser viewing and 1-click copying.
- * This ensures that on Vercel or any deployment, users can copy the full code directly from the web app.
- */
-export const GOOGLE_APPS_SCRIPT_CODE = `/**
- * ============================================================================
- * GOOGLE APPS SCRIPT FOR REAL-TIME HABIT TRACKER BACKEND
- * ============================================================================
- * 
- * HOW TO INSTALL IN GOOGLE SHEETS:
- * 1. Open Google Sheets (create a new blank spreadsheet at sheets.new).
- * 2. Click "Extensions" > "Apps Script" in the top menu.
- * 3. Delete any existing code in the editor, and paste this entire script.
- * 4. Click the "Save" icon (or Ctrl+S).
- * 5. Click the blue "Deploy" button (top right) > "New deployment".
- * 6. Click the gear icon next to "Select type" and choose "Web app".
- * 7. In the settings:
- *    - Description: "Habit Tracker Backend"
- *    - Execute as: "Me" (your Google account)
- *    - Who has access: "Anyone" (IMPORTANT: must be "Anyone" so the app can sync)
- * 8. Click "Deploy".
- * 9. Authorize the permissions when prompted (click "Advanced" > "Go to ... (unsafe)" > "Allow").
- * 10. Copy the "Web app URL" (it looks like: https://script.google.com/macros/s/.../exec).
- * 11. Paste that URL into your Habit Tracker.
- * 
- * That's it! Your Google Sheet will now create all 4 tabs (Habits, Entries, Notes, Routine)
- * automatically and sync all data in real-time as you use the tracker.
- * ============================================================================
- */
-
-const HEADERS = {
+export const GOOGLE_APPS_SCRIPT_CODE = `const HEADERS = {
   habits: ['id', 'name', 'emoji', 'monthlyGoal', 'order', 'createdAt'],
   entries: ['habitId', 'date', 'completed'],
   notes: ['id', 'text', 'color', 'createdAt'],
@@ -36,18 +6,39 @@ const HEADERS = {
 };
 
 function extractTime(val, fallback) {
-  if (!val) return fallback;
+  if (val === undefined || val === null || val === '') return fallback;
   if (val instanceof Date) {
     var hh = ('0' + val.getHours()).slice(-2);
     var mm = ('0' + val.getMinutes()).slice(-2);
     return hh + ':' + mm;
   }
   var str = String(val).trim();
-  var match = str.match(/(?:^|\s|T)?(\d{1,2}):(\d{2})(?::\d{2})?/);
-  if (match) {
-    var h = ('0' + parseInt(match[1], 10)).slice(-2);
-    var m = match[2];
+  
+  var num = Number(str);
+  if (!isNaN(num) && num >= 0 && num < 1 && str.indexOf('.') !== -1) {
+    var totalMins = Math.round(num * 24 * 60);
+    var h = ('0' + Math.floor(totalMins / 60)).slice(-2);
+    var m = ('0' + (totalMins % 60)).slice(-2);
     return h + ':' + m;
+  }
+  
+  if (/^\\d{4}-\\d{2}-\\d{2}T/.test(str)) {
+    if (str.indexOf('1899') !== -1) {
+      str = str.replace('1899-12-30', '2000-01-01');
+    }
+    var d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      var h2 = ('0' + d.getHours()).slice(-2);
+      var m2 = ('0' + d.getMinutes()).slice(-2);
+      return h2 + ':' + m2;
+    }
+  }
+
+  var match = str.match(/(?:^|\\s|T)?(\\d{1,2}):(\\d{2})(?::\\d{2})?/);
+  if (match) {
+    var h3 = ('0' + parseInt(match[1], 10)).slice(-2);
+    var m3 = match[2];
+    return h3 + ':' + m3;
   }
   return fallback;
 }
@@ -59,7 +50,7 @@ function getOrCreateSheet(ss, name, headers) {
     sheet.appendRow(headers);
     const headerRange = sheet.getRange(1, 1, 1, headers.length);
     headerRange.setFontWeight('bold');
-    headerRange.setBackground('#F5EBE6'); // Terracotta tint
+    headerRange.setBackground('#F5EBE6');
     headerRange.setFontColor('#4A2A1A');
     sheet.setFrozenRows(1);
   }
@@ -70,13 +61,11 @@ function doGet(e) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Ensure all 4 sheets exist with headers
     const habitsSheet = getOrCreateSheet(ss, 'Habits', HEADERS.habits);
     const entriesSheet = getOrCreateSheet(ss, 'Entries', HEADERS.entries);
     const notesSheet = getOrCreateSheet(ss, 'Notes', HEADERS.notes);
     const routineSheet = getOrCreateSheet(ss, 'Routine', HEADERS.routine);
 
-    // Read Habits
     const habitsData = habitsSheet.getDataRange().getValues();
     const habits = [];
     for (let i = 1; i < habitsData.length; i++) {
@@ -92,7 +81,6 @@ function doGet(e) {
       });
     }
 
-    // Read Entries
     const entriesData = entriesSheet.getDataRange().getValues();
     const entries = [];
     for (let i = 1; i < entriesData.length; i++) {
@@ -105,7 +93,6 @@ function doGet(e) {
       });
     }
 
-    // Read Notes
     const notesData = notesSheet.getDataRange().getValues();
     const notes = [];
     for (let i = 1; i < notesData.length; i++) {
@@ -119,7 +106,6 @@ function doGet(e) {
       });
     }
 
-    // Read Routine
     const routineData = routineSheet.getDataRange().getValues();
     const routine = [];
     for (let i = 1; i < routineData.length; i++) {
@@ -173,7 +159,6 @@ function doPost(e) {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // 1. Sync Habits if provided
     if (body.habits && Array.isArray(body.habits)) {
       const sheet = getOrCreateSheet(ss, 'Habits', HEADERS.habits);
       const lastRow = sheet.getLastRow();
@@ -193,7 +178,6 @@ function doPost(e) {
       }
     }
 
-    // 2. Sync Entries if provided
     if (body.entries && Array.isArray(body.entries)) {
       const sheet = getOrCreateSheet(ss, 'Entries', HEADERS.entries);
       const lastRow = sheet.getLastRow();
@@ -210,7 +194,6 @@ function doPost(e) {
       }
     }
 
-    // 3. Sync Notes if provided
     if (body.notes && Array.isArray(body.notes)) {
       const sheet = getOrCreateSheet(ss, 'Notes', HEADERS.notes);
       const lastRow = sheet.getLastRow();
@@ -228,7 +211,6 @@ function doPost(e) {
       }
     }
 
-    // 4. Sync Routine if provided
     if (body.routine && Array.isArray(body.routine)) {
       const sheet = getOrCreateSheet(ss, 'Routine', HEADERS.routine);
       const lastRow = sheet.getLastRow();
@@ -262,4 +244,5 @@ function doPost(e) {
       message: error.message
     })).setMimeType(ContentService.MimeType.JSON);
   }
-}`;
+}
+`;
