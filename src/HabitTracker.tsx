@@ -93,7 +93,6 @@ export function HabitTracker() {
   const hasLoadedRef = useRef(false);
 
   // Live real-time syncing state
-  const [isLiveSyncing, setIsLiveSyncing] = useState(false);
   const [lastLiveSyncTime, setLastLiveSyncTime] = useState<Date | null>(null);
 
   // Google Sheets backend connection state
@@ -130,7 +129,6 @@ export function HabitTracker() {
     }
 
     try {
-      setIsLiveSyncing(true);
       const { data: freshData, notes: freshNotes, routine: freshRoutine } = await fetchAllData(true);
       
       // Double check after fetch roundtrip that user didn't perform an action while request was in-flight
@@ -167,8 +165,6 @@ export function HabitTracker() {
       setLastLiveSyncTime(new Date());
     } catch {
       // Silently handle transient network hiccup
-    } finally {
-      setIsLiveSyncing(false);
     }
   }, []);
 
@@ -565,57 +561,6 @@ export function HabitTracker() {
             <div className="hidden md:block">
               <LiveClock />
             </div>
-
-            {/* Google Sheets Real-time Live Sync Controls */}
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => {
-                  setInputScriptUrl(getActiveScriptUrl());
-                  setShowSheetsModal(true);
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer ${
-                  backendStatus?.configured
-                    ? isLiveSyncing || backendStatus.isSyncing
-                      ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-xs'
-                      : 'bg-emerald-50/90 text-emerald-800 border-emerald-200/80 shadow-xs'
-                    : 'bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100 animate-pulse'
-                }`}
-                title="Click to view Google Sheets Sync settings"
-              >
-                <Sheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                {backendStatus?.configured ? (
-                  isLiveSyncing || backendStatus.isSyncing ? (
-                    <>
-                      <RefreshCw className="w-3 h-3 animate-spin text-amber-600 shrink-0" />
-                      <span className="hidden sm:inline">Syncing Live...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                      <span className="hidden sm:inline">Live Sheets Sync</span>
-                    </>
-                  )
-                ) : (
-                  <>
-                    <AlertCircle className="w-3.5 h-3.5 text-primary-600 shrink-0" />
-                    <span className="hidden sm:inline">Connect Sheet</span>
-                  </>
-                )}
-              </button>
-
-              {/* Quick Manual Pull Button */}
-              {backendStatus?.configured && (
-                <button
-                  onClick={() => pollLiveUpdates()}
-                  disabled={isLiveSyncing}
-                  className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-surface-200/80 bg-white/90 hover:bg-surface-50 text-surface-600 hover:text-emerald-700 text-xs font-medium transition-all hover:scale-105 active:scale-95 shadow-xs"
-                  title="Pull latest data directly from Google Sheet right now"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isLiveSyncing ? 'animate-spin' : ''}`} />
-                  <span className="hidden xl:inline">Pull Latest</span>
-                </button>
-              )}
-            </div>
           </div>
 
           {/* Right: Actions */}
@@ -626,15 +571,6 @@ export function HabitTracker() {
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Habit</span>
-            </button>
-
-            {/* Mobile Sheets Config Icon */}
-            <button
-              onClick={() => setShowSheetsModal(true)}
-              className="lg:hidden p-2 rounded-xl transition-all hover:scale-105 active:scale-95 hover:bg-surface-100 text-surface-600"
-              title="Google Sheets Settings"
-            >
-              <Sheet className="w-4.5 h-4.5 text-emerald-600" />
             </button>
 
             <button
@@ -651,6 +587,28 @@ export function HabitTracker() {
               title="Import data"
             >
               <Upload className="w-4.5 h-4.5" />
+            </button>
+
+            {/* Google Sheets Sync Button */}
+            <button
+              onClick={() => {
+                setInputScriptUrl(getActiveScriptUrl());
+                setShowSheetsModal(true);
+              }}
+              className={`rounded-xl border transition-colors cursor-pointer flex items-center justify-center ${
+                backendStatus?.configured
+                  ? 'p-2 bg-emerald-50/90 text-emerald-800 border-emerald-200/80 hover:bg-emerald-100/90 shadow-xs'
+                  : 'px-2.5 py-1.5 bg-primary-50 text-primary-700 border-primary-200 hover:bg-primary-100 text-xs font-semibold gap-1.5'
+              }`}
+              title={backendStatus?.configured ? 'Google Sheets Connected (Live Sync)' : 'Connect Google Sheet'}
+            >
+              <Sheet className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+              {!backendStatus?.configured && (
+                <>
+                  <AlertCircle className="w-3.5 h-3.5 text-primary-600 shrink-0" />
+                  <span className="hidden sm:inline">Connect Sheet</span>
+                </>
+              )}
             </button>
 
             <input
